@@ -1,0 +1,14 @@
+plugin_blacklist:
+# common
+- actuator_control
+- ftp
+- safety_area
+- setpoint_attitude
+# extras
+- image_pub
+- vibration
+- altitude
+- optitrack_bridge
+
+plugin_whitelist: []
+#- 'sys_*'

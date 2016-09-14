@@ -1,0 +1,5 @@
+<library path="lib/libmavros_extras">
+	<class name="optitrack_bridge" type="mavplugin::OptitrackPlugin" base_class_type="mavplugin::MavRosPlugin">
+		<description>Publish GPS_INPUT message data from the output optitrack ros bridge.</description>
+	</class>
+</library>
