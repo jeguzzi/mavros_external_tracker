@@ -2,8 +2,20 @@
 	<!-- vim: set ft=xml noet : -->
 	<!-- example launch script for ArduPilotMega based FCU's  -->
 
-	<arg name="fcu_url" default="udp://127.0.0.1:14550" />
-	<!-- <arg name="gcs_url" default="udp://127.0.0.1@127.0.0.1:14550" /> -->
+<rosparam param="mavros/mocap">
+origin:
+  latitude: 46.026399
+  longitude: 8.918542
+  altitude: 300.0
+  heading: 20.0
+gps_id: 0
+</rosparam>
+
+<node pkg="topic_tools" type="throttle" name="throttle_pose" args="messages optitrack/erlerover 10.0 mavros/mocap/pose"/>
+
+
+	<arg name="fcu_url" default="udp://:14550@" />
+	<arg name="gcs_url" default="udp://@" />
 	<arg name="tgt_system" default="1" />
 	<arg name="tgt_component" default="1" />
 	<arg name="log_output" default="screen" />
@@ -13,9 +25,10 @@
 		<arg name="config_yaml" value="$(find mavros)/launch/apm_config.yaml" />
 
 		<arg name="fcu_url" value="$(arg fcu_url)" />
-		<!-- <arg name="gcs_url" value="$(arg gcs_url)" /> -->
+		<arg name="gcs_url" value="$(arg gcs_url)" />
 		<arg name="tgt_system" value="$(arg tgt_system)" />
 		<arg name="tgt_component" value="$(arg tgt_component)" />
 		<arg name="log_output" value="$(arg log_output)" />
+
 	</include>
 </launch>

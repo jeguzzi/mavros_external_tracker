@@ -6,9 +6,12 @@ plugin_blacklist:
 - setpoint_attitude
 # extras
 - image_pub
+- 'mocap_*'
+- px4flow
+- 'vision_*'
+- distance_sensor
 - vibration
 - altitude
-- optitrack_bridge
 
 plugin_whitelist: []
 #- 'sys_*'
