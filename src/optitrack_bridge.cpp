@@ -20,6 +20,7 @@
 
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <sensor_msgs/NavSatFix.h>
 #define _USE_MATH_DEFINES
 
 #define wgs84_a 6378137.0 //meters
@@ -56,20 +57,23 @@ public:
 
 		double lat = origin_["latitude"];
 		double lon = origin_["longitude"];
-		origin = Eigen::Vector2d(lon * 1e7, lat * 1e7);
+		origin = Eigen::Vector2d(lon, lat);
 		alt = origin_["altitude"];
-		double angle = - origin_["heading"] * M_PI / 180.0;
+		double angle = origin_["heading"] * M_PI / 180.0;
+	  printf("\nangle %.2f\n", angle);
 
 		// For now, let the earth be modelled as a circle with radius WGS84_a
 
-		double nx = 1e7 / (wgs84_a * cos(lon * M_PI / 180.0) * M_PI / 180.0);
-		double ny = 1e7 / (wgs84_a * M_PI / 180.0);
+		double nx = 1.0 / (wgs84_a * cos(lat * M_PI / 180.0) * M_PI / 180.0);
+		double ny = 1.0 / (wgs84_b * M_PI / 180.0);
 
-		local2latlon << cos(angle) * nx , -sin(angle) * ny,
-				            sin(angle) * nx, cos(angle) * ny;
+		local2latlon << cos(angle) * nx , -sin(angle) * nx,
+				            sin(angle) * ny, cos(angle) * ny;
+
+		std::cout << local2latlon << std::endl;
 
 		mocap_pose_sub = mp_nh.subscribe("pose", 1, &OptitrackPlugin::mocap_pose_cb, this);
-
+		nav_sat_pub = mp_nh.advertise<sensor_msgs::NavSatFix>("fix", 1);
 	}
 
 	Subscriptions get_subscriptions()
@@ -86,6 +90,7 @@ private:
 
 
 	ros::Subscriber mocap_pose_sub;
+	ros::Publisher nav_sat_pub;
 
 	/* -*- low-level send -*- */
 	void mocap_send_gps_input(uint64_t usec, double lat, double lon)
@@ -119,8 +124,8 @@ private:
 		fix.ignore_flags = 56; //i.e. ignore velocity informations
 		fix.time_week_ms = 464508000; // TODO compute from UTM time
 		fix.time_week = 1914; // TODO compute from UTM time
-		fix.lat = round(lat);
-		fix.lon = round(lon);
+		fix.lat = round(lat * 1e7);
+		fix.lon = round(lon * 1e7);
 		fix.fix_type = 3;
 		fix.alt = alt;
 		fix.hdop = 0.01;
@@ -134,6 +139,10 @@ private:
 
 		UAS_FCU(m_uas)->send_message_ignore_drop(fix);
 		ROS_DEBUG("Send message %s",fix.to_yaml().data());
+
+
+
+
 	}
 
 	/* -*- mid-level helpers -*- */
@@ -142,6 +151,17 @@ private:
 		Eigen::Vector2d position = Eigen::Vector2d(pose->pose.position.x,pose->pose.position.y);
 		Eigen::Vector2d latlon = local2latlon * position + origin;
 		mocap_send_gps_input(pose->header.stamp.toNSec() / 1000, latlon[1], latlon[0]);
+
+		sensor_msgs::NavSatFix msg;
+		msg.header.stamp = pose->header.stamp;
+		msg.header.frame_id = "base_link";
+		//msg.status = ...;
+		msg.latitude = (double) latlon[1];
+		msg.longitude = (double) latlon[0];
+		msg.altitude = alt;
+		msg.position_covariance_type = sensor_msgs::NavSatFix::COVARIANCE_TYPE_UNKNOWN;
+
+		nav_sat_pub.publish(msg);
 	}
 
 
