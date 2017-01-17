@@ -57,7 +57,7 @@ include_directories(
 )
 
 add_library(mavros_external_tracker
-  src/optitrack_bridge.cpp
+  src/optitrack_bridge_utm.cpp
 )
 target_link_libraries(mavros_external_tracker
   ${mavros_LIBRARIES}

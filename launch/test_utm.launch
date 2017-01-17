@@ -1,0 +1,52 @@
+<launch>
+  <!-- vim: set ft=xml noet : -->
+  <!-- example launch script for ArduPilotMega based FCU's  -->
+
+  <arg name="rigid_body" default="erlerover"/>
+
+  <rosparam param="mavros/mocap">
+     publish_fix: false
+     utm_zone: 32N
+     gps_id: 0
+  </rosparam>
+
+  <node pkg="topic_tools" type="throttle" name="throttle_pose" args="messages optitrack/$(arg rigid_body) 10.0 mavros/mocap/pose"/>
+
+  <arg name="fcu_url" default="udp://:14550@"/>
+  <arg name="gcs_url" default="udp://@"/>
+  <arg name="tgt_system" default="1"/>
+  <arg name="tgt_component" default="1"/>
+  <arg name="log_output" default="screen"/>
+
+  <include file="$(find mavros)/launch/node.launch">
+    <arg name="pluginlists_yaml" value="$(find mavros_external_tracker)/launch/apm_pluginlists.yaml"/>
+    <arg name="config_yaml" value="$(find mavros)/launch/apm_config.yaml"/>
+    <arg name="fcu_url" value="$(arg fcu_url)"/>
+    <arg name="gcs_url" value="$(arg gcs_url)"/>
+    <arg name="tgt_system" value="$(arg tgt_system)"/>
+    <arg name="tgt_component" value="$(arg tgt_component)"/>
+    <arg name="log_output" value="$(arg log_output)"/>
+
+  </include>
+
+  <!-- <arg name="model" default="$(find mavros_external_tracker)/urdf/rover_scaled.urdf"/> -->
+  <arg name="tf_prefix" default="$(optenv ROS_NAMESPACE)"/>
+  <arg name="log_file" default="rover"/>
+
+  <!-- send the robot XML to param server -->
+  <!-- <param name="robot_description" command="
+      $(find xacro)/xacro.py '$(arg model)'
+      enable_logging:=false
+      enable_ground_truth:=false
+      log_file:=$(arg log_file)"/>
+  <param name="tf_prefix" type="string" value="$(arg tf_prefix)"/> -->
+
+  <!-- push robot_description to factory and spawn robot in gazebo -->
+  <!-- <node name="state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"></node>
+  <node name="j_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"></node> -->
+  <node name="otf" pkg="message_to_tf" type="message_to_tf" args="/optitrack/erlerover"/>
+
+  <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="0 0 0 0 0 0 base_link chassis 100"/>
+  <node pkg="tf" type="static_transform_publisher" name="link2_broadcaster" args="0 0 0 0 0 0 base_link fcu 100"/>
+
+</launch>
