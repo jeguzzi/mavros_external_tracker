@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     ros-kinetic-mavros \
     ros-kinetic-tf \
     ros-kinetic-message-to-tf \
+    ros-kinetic-tf2-geometry-msgs \
     wget
 # RUN pip install --upgrade pip
 

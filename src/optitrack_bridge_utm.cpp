@@ -19,7 +19,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <mavros/gps_conversions.h>
-#include <tf/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 namespace mavros {
 namespace extra_plugins{
@@ -41,6 +41,11 @@ public:
 	void initialize(UAS &uas_)
 	{
 		PluginBase::initialize(uas_);
+		// toUTM_defined = false;
+		// tf_frame_id = "World";
+		// tf_child_frame_id = "utm";
+		// tf_rate = 10.0;
+		// tf2_start("optitrackTF", &OptitrackPlugin::transform_cb);
 		mp_nh.param("gps_id", gps_id, 0);
 		mp_nh.param("publish_fix", publish_fix, false);
 		mocap_pose_sub = mp_nh.subscribe("pose", 1, &OptitrackPlugin::mocap_pose_cb, this);
@@ -53,13 +58,25 @@ public:
 	}
 
 private:
-	tf::TransformListener tl;
+	// friend class TF2ListenerMixin;
+	// bool toUTM_defined;
+	// bool tf_listen;
+	// std::string tf_frame_id;
+	// std::string tf_child_frame_id;
+	// double tf_rate;
 	std::string utm_zone_;
 	ros::NodeHandle mp_nh;
 	int gps_id;
 	ros::Subscriber mocap_pose_sub;
 	ros::Publisher nav_sat_pub;
 	bool publish_fix;
+	// tf::StampedTransform toUTM;
+
+	// void transform_cb(const geometry_msgs::TransformStamped &transform) {
+	// 	ROS_INFO("Received tf -> define toUTM");
+	// 	tf::transformStampedMsgToTF(transform, toUTM);
+	// 	toUTM_defined = true;
+	// }
 
 	/* -*- low-level send -*- */
 	void mocap_send_gps_input(uint64_t usec, double lat, double lon, double alt)
@@ -112,18 +129,56 @@ private:
 	}
 
 	/* -*- mid-level helpers -*- */
-	void mocap_pose_cb(const geometry_msgs::PoseStamped::ConstPtr &pose)
+	void mocap_pose_cb(const geometry_msgs::PoseStamped::ConstPtr &pose_msg)
 	{
-		geometry_msgs::PoseStamped utm_pose;
-		tl.transformPose(std::string("utm"), *pose, utm_pose);
+
+		// tf::Pose pose;
+		// tf::Pose utm_pose;
+		// tf::poseMsgToTF(pose_msg->pose, pose);
+		geometry_msgs::PoseStamped utm_pose_msg;
+		try {
+			geometry_msgs::TransformStamped transform = m_uas->tf2_buffer.lookupTransform("utm", pose_msg->header.frame_id, ros::Time(0), ros::Duration(0.1));
+			tf2::doTransform(*pose_msg, utm_pose_msg, transform);
+		}
+		catch (tf2::TransformException &ex) {
+			ROS_ERROR("%s \nFrames: %s", ex.what(), m_uas->tf2_buffer.allFramesAsString().data());
+			return;
+		}
+
+
+
+		// except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
+		//         tf2_ros.ExtrapolationException) as e:
+
+		// if(toUTM_defined)
+		// {
+		// 	utm_pose = toUTM * pose;
+		// }
+		// else
+		// {
+		// 	ROS_ERROR("Cannot tranform between World and utm");
+		// 	return;
+		// }
+		// geometry_msgs::Pose utm_pose_msg;
+		// tf::poseTFToMsg(utm_pose, utm_pose_msg);
+		// try{
+		// 	tl.transformPose(std::string("utm"), *pose, utm_pose);
+		// }
+		// catch (tf::TransformException &ex) {
+		// 	ROS_ERROR("%s",ex.what());
+		// 	ROS_ERROR("%s", tl.allFramesAsString().data());
+		// 	return;
+		// }
+
 		double lat, lon;
-		double alt = pose->pose.position.z;
-		UTM::UTMtoLL(pose->pose.position.y, pose->pose.position.x, utm_zone_, lat, lon);
-		mocap_send_gps_input(pose->header.stamp.toNSec() / 1000, lat, lon, alt);
+		double alt = utm_pose_msg.pose.position.z;
+		UTM::UTMtoLL(utm_pose_msg.pose.position.y, utm_pose_msg.pose.position.x, utm_zone_, lat, lon);
+		ROS_INFO("pose %f %f -> lat %f lon %f", utm_pose_msg.pose.position.x, utm_pose_msg.pose.position.y, lat, lon);
+		mocap_send_gps_input(pose_msg->header.stamp.toNSec() / 1000, lat, lon, alt);
 		if(publish_fix)
 		{
 			sensor_msgs::NavSatFix msg;
-			msg.header.stamp = pose->header.stamp;
+			msg.header.stamp = pose_msg->header.stamp;
 			msg.header.frame_id = "base_link";
 			msg.latitude = lat;
 			msg.longitude = lon;
