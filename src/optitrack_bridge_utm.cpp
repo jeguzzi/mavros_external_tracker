@@ -48,6 +48,9 @@ public:
 		// tf2_start("optitrackTF", &OptitrackPlugin::transform_cb);
 		mp_nh.param("gps_id", gps_id, 0);
 		mp_nh.param("publish_fix", publish_fix, false);
+		mp_nh.param("h_error", h_error, 0.01);
+		mp_nh.param("v_error", v_error, 0.01);
+		mp_nh.param("include_altitude", include_altitude, true);
 		mocap_pose_sub = mp_nh.subscribe("pose", 1, &OptitrackPlugin::mocap_pose_cb, this);
 		nav_sat_pub = mp_nh.advertise<sensor_msgs::NavSatFix>("fix", 1);
 	}
@@ -70,6 +73,9 @@ private:
 	ros::Subscriber mocap_pose_sub;
 	ros::Publisher nav_sat_pub;
 	bool publish_fix;
+	bool include_altitude;
+	double h_error;
+	double v_error;
 	// tf::StampedTransform toUTM;
 
 	// void transform_cb(const geometry_msgs::TransformStamped &transform) {
@@ -108,19 +114,23 @@ private:
 		fix.time_usec = usec;
 		fix.gps_id = gps_id;
 		fix.ignore_flags = 56; //i.e. ignore velocity informations
+		if(!include_altitude)
+		{
+			fix.ignore_flags += 1;
+		}
 		fix.time_week_ms = 464508000; // TODO compute from UTM time
 		fix.time_week = 1914; // TODO compute from UTM time
 		fix.lat = round(lat * 1e7);
 		fix.lon = round(lon * 1e7);
 		fix.fix_type = 3;
 		fix.alt = alt;
-		fix.hdop = 0.01;
-		fix.vdop = 0.01;
+		fix.hdop = h_error;
+		fix.vdop = v_error;
 		fix.vn = 0.0;
 		fix.ve = 0.0;
 		fix.speed_accuracy = 0.01;
-		fix.horiz_accuracy = 0.01;
-		fix.vert_accuracy = 0.01;
+		fix.horiz_accuracy = h_error;
+		fix.vert_accuracy = v_error;
 		fix.satellites_visible = 12;
 
 		UAS_FCU(m_uas)->send_message_ignore_drop(fix);
