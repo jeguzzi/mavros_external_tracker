@@ -1,0 +1,26 @@
+<launch>
+    <arg name="ns" default="$(optenv HOSTNAME rover_0)"/>
+    <group ns="$(arg ns)">
+        <arg name="h_error" default="0.3"/>
+        <rosparam param="mavros/mocap" subst_value="true">
+            publish_fix: true utm_zone: 32N gps_id: 0 h_error: $(arg h_error)
+        </rosparam>
+
+        <arg name="fcu_url" default="udp://:6001@"/>
+        <arg name="gcs_url" default="udp://:14555@"/>
+
+        <arg name="tgt_system" default="1"/>
+        <arg name="tgt_component" default="1"/>
+        <arg name="log_output" default="log"/>
+
+        <include file="$(find mavros)/launch/node.launch">
+            <arg name="pluginlists_yaml" value="$(find mavros_external_tracker)/launch/apm_pluginlists.yaml"/>
+            <arg name="fcu_url" value="$(arg fcu_url)"/>
+            <arg name="gcs_url" value="$(arg gcs_url)"/>
+            <arg name="tgt_system" value="$(arg tgt_system)"/>
+            <arg name="tgt_component" value="$(arg tgt_component)"/>
+            <arg name="log_output" value="$(arg log_output)"/>
+            <arg name="config_yaml" value="$(find mavros)/launch/apm_config.yaml"/>
+        </include>
+    </group>
+</launch>
