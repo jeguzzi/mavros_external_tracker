@@ -1,0 +1,7 @@
+version: '2'
+services:
+  mavros:
+     build:
+        dockerfile: docker/armhf/Dockerfile
+        context: ../..
+     image: jeguzzi/df:armhf-mavros-mocap

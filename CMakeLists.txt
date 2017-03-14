@@ -11,7 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   std_msgs
   tf
-  # tf2_geometry_msgs
+  tf2_geometry_msgs
+  nav_msgs
 )
 
 find_package(Eigen3)

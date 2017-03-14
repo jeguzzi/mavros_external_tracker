@@ -1,0 +1,7 @@
+version: '2'
+services:
+  mavros:
+     build:
+        dockerfile: docker/Dockerfile
+        context: ..
+     image: mavros:mocap

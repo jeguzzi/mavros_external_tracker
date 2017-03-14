@@ -20,11 +20,12 @@
   <depend>mavros</depend>
   <depend>roscpp</depend>
   <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>mavros_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>tf</depend>
-  <!-- <depend>tf2_geometry_msgs</depend> -->
+  <depend>tf2_geometry_msgs</depend>
   <export>
     <mavros plugin="${prefix}/mavros_plugins.xml" />
   </export>
