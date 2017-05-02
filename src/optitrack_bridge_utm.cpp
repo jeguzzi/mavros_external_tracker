@@ -21,6 +21,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/NavSatStatus.h>
 #include <mavros/gps_conversions.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
@@ -48,8 +49,12 @@ public:
         mp_nh.param("h_error", h_error, 0.01);
         mp_nh.param("v_error", v_error, 0.01);
         mp_nh.param("include_altitude", include_altitude, true);
+        // Used to correct a bug. The mavlink message altitude field is meant to be in meters BUT
+        // is interpreted as cm
+        mp_nh.param("altitude_factor", altitude_factor, 100.0);
         mocap_pose_sub = mp_nh.subscribe("pose", 1, &OptitrackPlugin::mocap_pose_cb, this);
         mocap_odom_sub = mp_nh.subscribe("odom", 1, &OptitrackPlugin::mocap_odom_cb, this);
+        nav_sat_sub = mp_nh.subscribe("input_fix", 1, &OptitrackPlugin::fix_cb, this);
         nav_sat_pub = mp_nh.advertise<sensor_msgs::NavSatFix>("fix", 1);
     }
 
@@ -64,9 +69,11 @@ private:
     int gps_id;
     ros::Subscriber mocap_pose_sub;
 	 ros::Subscriber mocap_odom_sub;
+    ros::Subscriber nav_sat_sub;
     ros::Publisher nav_sat_pub;
     bool publish_fix;
     bool include_altitude;
+    double altitude_factor;
     double h_error, v_error, s_error;
 
     /* -*- low-level send -*- */
@@ -112,7 +119,7 @@ private:
         fix.lat = round(lat * 1e7);
         fix.lon = round(lon * 1e7);
         fix.fix_type = 3;
-        fix.alt = alt;
+        fix.alt = alt * altitude_factor;
         fix.hdop = h_error;
         fix.vdop = v_error;
         fix.vn = vn;
@@ -206,6 +213,44 @@ private:
             return;
         }
         send_gps_msgs(utm_pose_msg.pose.position, pose_msg->header.stamp);
+    }
+
+    void fix_cb(const sensor_msgs::NavSatFix::ConstPtr &fix_msg)
+    {
+      uint64_t usec = fix_msg->header.stamp.toNSec() / 1000;
+      mavlink::common::msg::GPS_INPUT fix;
+      fix.time_usec = usec;
+      fix.gps_id = gps_id;
+      fix.ignore_flags = 56; //ignore velocity amd its error
+      // if(!include_altitude)
+      // {
+      //     fix.ignore_flags += 133; //i.e. ignore altitude (and its errors)
+      // }
+      fix.time_week_ms = 464508000; // TODO compute from UTM time
+      fix.time_week = 1914; // TODO compute from UTM time
+      fix.lat = round(fix_msg->latitude * 1e7);
+      fix.lon = round(fix_msg->longitude * 1e7);
+      if(fix_msg->status.status == sensor_msgs::NavSatStatus::STATUS_NO_FIX)
+      {
+         fix.fix_type = 3;
+      }
+      else
+      {
+         fix.fix_type = 0;
+      }
+      fix.alt = fix_msg->altitude * altitude_factor;
+      // TODO: get errors from fix_msg->covariance and fix_msg->position_covariance_type
+      // fix.hdop = h_error;
+      // fix.vdop = v_error;
+      // fix.horiz_accuracy = h_error;
+      // fix.vert_accuracy = v_error;
+      fix.satellites_visible = 10;
+      UAS_FCU(m_uas)->send_message_ignore_drop(fix);
+      ROS_DEBUG("Send message %s",fix.to_yaml().data());
+      if(publish_fix)
+      {
+          nav_sat_pub.publish(fix_msg);
+      }
     }
 };
 }    // namespace extra_plugins
