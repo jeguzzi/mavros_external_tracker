@@ -2,12 +2,13 @@ FROM jeguzzi/ros:kinetic-ros-dev
 MAINTAINER Jerome Guzzi "jerome@idsia.ch"
 
 RUN apt-get update && apt-get install -y \
-    python-pip \
     ros-kinetic-mavros \
+    ros-kinetic-mavros-extras \
     ros-kinetic-tf \
     ros-kinetic-message-to-tf \
     ros-kinetic-tf2-geometry-msgs \
-    wget
+    ros-kinetic-dynamic-reconfigure \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . src/mavros_external_tracker
 RUN catkin build

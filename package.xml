@@ -3,7 +3,7 @@
   <name>mavros_external_tracker</name>
   <version>0.0.1</version>
   <description>
-    Optitrack plugin for <a href="http://wiki.rot.org/mavros">MAVROS</a>.
+    Mocap plugin for <a href="http://wiki.rot.org/mavros">MAVROS</a>.
   </description>
 
   <maintainer email="jerome@idsia.ch">JG</maintainer>
@@ -26,6 +26,7 @@
   <depend>std_msgs</depend>
   <depend>tf</depend>
   <depend>tf2_geometry_msgs</depend>
+  <depend>dynamic_reconfigure</depend>
   <export>
     <mavros plugin="${prefix}/mavros_plugins.xml" />
   </export>

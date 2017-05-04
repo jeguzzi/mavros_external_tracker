@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   tf2_geometry_msgs
   nav_msgs
+  dynamic_reconfigure
 )
 
 find_package(Eigen3)
@@ -32,6 +33,9 @@ include(MavrosMavlink)
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
 # catkin_python_setup()
 
+generate_dynamic_reconfigure_options(
+  cfg/Tracker.cfg
+)
 
 
 ###################################
@@ -46,7 +50,7 @@ include(MavrosMavlink)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES
-  CATKIN_DEPENDS mavros mavros_msgs roscpp geometry_msgs
+  CATKIN_DEPENDS mavros mavros_msgs roscpp geometry_msgs dynamic_reconfigure
 )
 
 ###########
