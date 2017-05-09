@@ -64,6 +64,7 @@ public:
         mp_nh.param("h_error", h_error, 0.01); //Dynamic
         mp_nh.param("v_error", v_error, 0.01); //Dynamic
         mp_nh.param("include_altitude", include_altitude, true); //Dynamic
+        mp_nh.param("include_gps_altitude", include_gps_altitude, false);
         // Used to correct a bug. The mavlink message altitude field is meant to be in meters BUT
         // is interpreted as cm
         mp_nh.param("altitude_factor", altitude_factor, 100.0);
@@ -97,7 +98,7 @@ private:
     ros::Subscriber range_sub;
     ros::Publisher nav_sat_pub;
 
-    bool include_altitude;
+    bool include_altitude, include_gps_altitude;
     double altitude_factor;
     double h_error, v_error, s_error;
     ros::Time range_stamp;
@@ -315,6 +316,11 @@ private:
          alt = range;
          fix.vdop = v_error;
          fix.vert_accuracy = v_error;
+      }
+
+      if(!include_gps_altitude && !should_use_range)
+      {
+          fix.ignore_flags += 133; //i.e. ignore altitude (and its errors)
       }
 
       fix.alt = alt * altitude_factor;
