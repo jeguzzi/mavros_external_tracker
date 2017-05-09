@@ -2,4 +2,7 @@
 	<class name="optitrack_bridge" type="mavros::extra_plugins::OptitrackPlugin" base_class_type="mavros::plugin::PluginBase">
 		<description>Publish GPS_INPUT message data from the output optitrack ros bridge.</description>
 	</class>
+	<class name="rangefinder" type="mavros::extra_plugins::RangeFinderPlugin" base_class_type="mavros::plugin::PluginBase">
+		<description>Republish a mavlink rangefinder msg (ardupilotmega) as a ROS Range msg.</description>
+	</class>
 </library>

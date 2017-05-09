@@ -64,11 +64,13 @@ include_directories(
 
 add_library(mavros_external_tracker
   src/optitrack_bridge_utm.cpp
+  src/range_finder.cpp
 )
 target_link_libraries(mavros_external_tracker
   ${mavros_LIBRARIES}
   ${catkin_LIBRARIES}
 )
+
 
 ## Declare a cpp executable
 

@@ -127,11 +127,12 @@ private:
 
     bool use_range()
     {
+      // ROS_INFO("use_range: %d %d %d", range_enable, range_is_valid, (ros::Time::now() - range_stamp).toSec() < range_timeout);
       return range_enable && range_is_valid && (ros::Time::now() - range_stamp).toSec() < range_timeout;
     }
 
     /* -*- low-level send -*- */
-    void mocap_send_gps_input(uint64_t usec, double lat, double lon, double alt, double ve, double vn, bool ignore_velocity)
+    void mocap_send_gps_input(uint64_t usec, double lat, double lon, double alt, double ve, double vn, bool ignore_velocity, bool ignore_altitude)
     {
 
       // <message id="232" name="GPS_INPUT">
@@ -165,13 +166,7 @@ private:
 			  fix.ignore_flags += 40; //i.e. ignore horizontal velocity (and its error)
 		  }
 
-        bool should_use_range = use_range();
-        if(should_use_range)
-        {
-           alt = range;
-        }
-
-        if(!include_altitude && !should_use_range)
+        if(ignore_altitude)
         {
             fix.ignore_flags += 133; //i.e. ignore altitude (and its errors)
         }
@@ -205,14 +200,26 @@ private:
                        const ros::Time &stamp, bool ignore_velocity=false)
     {
         double lat, lon;
-        double alt = utm_point.z;
+        double alt;
+        bool should_use_range = use_range();
+        if(should_use_range)
+        {
+           alt = range;
+        }
+        else{
+           alt = utm_point.z;
+        }
+        //include_altitude = include altitude from pose
+        //should_use_range = include altitude from range
+        bool ignore_altitude = !include_altitude && !should_use_range;
+
         UTM::UTMtoLL(utm_point.y, utm_point.x, utm_zone_, lat, lon);
         if(enable_logs) ROS_DEBUG("pose (%.2f, %.2f) -> lat = %f,  lon = %f", utm_point.x, utm_point.y, lat, lon);
         // UTM: x axis points east
         //      y axis points north
         // that is ve = v.x and vn = v.y
         mocap_send_gps_input(stamp.toNSec() / 1000, lat, lon, alt, utm_velocity.x, utm_velocity.y,
-                             ignore_velocity);
+                             ignore_velocity, ignore_altitude);
         if(publish_fix)
         {
             sensor_msgs::NavSatFix msg;
