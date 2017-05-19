@@ -4,7 +4,7 @@
 
   <rosparam param="mavros/mocap">
      publish_fix: true
-     utm_zone: 32N
+     utm_zone: 32T
      gps_id: 0
   </rosparam>
 
