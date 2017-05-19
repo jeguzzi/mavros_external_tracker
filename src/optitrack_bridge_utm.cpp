@@ -30,6 +30,8 @@
 #include <mavros_external_tracker/TrackerConfig.h>
 
 
+
+
 namespace mavros {
 namespace extra_plugins{
 /**
@@ -37,14 +39,17 @@ namespace extra_plugins{
  *
  * Sends motion capture data to FCU.
  */
+
+using IGNORE = mavlink::common::GPS_INPUT_IGNORE_FLAGS;
+using mavlink::common::MAV_STATE;
+
 class OptitrackPlugin : public plugin::PluginBase
 {
 public:
     OptitrackPlugin() : PluginBase(),
         mp_nh("~mocap"),
-        r_nh("~mocap/range"),
-        utm_zone_("32T")
-      //   server(mp_nh)
+        server(ros::NodeHandle("~mocap"))
+        // r_nh("~mocap/range")
     { }
 
     void initialize(UAS &uas_)
@@ -53,16 +58,19 @@ public:
 
         range_is_valid = false;
         range_stamp = ros::Time::now();
-        r_nh.param("timeout", range_timeout, 1.0);  //Dynamic
-        r_nh.param("enable", range_enable, true); //Dynamic
-        r_nh.param("maximum", range_max, 100.0); //Dynamic
+        mp_nh.param("range_timeout", range_timeout, 1.0);  //Dynamic
+        mp_nh.param("range_enable", range_enable, true); //Dynamic
+        mp_nh.param("range_necessary", range_necessary, true); //Dynamic
+        mp_nh.param("range_maximum", range_max, 100.0); //Dynamic
         mp_nh.param("gps_id", gps_id, 0);
-      //   mp_nh.param<std::string>("utm_zone", utm_zone_, "32T");
+        mp_nh.param<std::string>("utm_zone", utm_zone, "32T");
         mp_nh.param("publish_fix", publish_fix, false); //Dynamic
-        mp_nh.param("enable_logs", enable_logs, false); //Dynamic
-        mp_nh.param("s_error", s_error, 0.01); //Dynamic
-        mp_nh.param("h_error", h_error, 0.01); //Dynamic
-        mp_nh.param("v_error", v_error, 0.01); //Dynamic
+        mp_nh.param("enable_logs", enable_logs, true); //Dynamic
+        mp_nh.param("s_error", s_error, 0.3); //Dynamic
+        mp_nh.param("h_error", h_error, 0.3); //Dynamic
+        mp_nh.param("v_error", v_error, 0.3); //Dynamic
+        // Used to correct a factor 10 difference between ardurover (v3.1) and arducopter(v3.4)
+        mp_nh.param("dop_factor", dop_factor, 1.0);
         mp_nh.param("include_altitude", include_altitude, true); //Dynamic
         mp_nh.param("include_gps_altitude", include_gps_altitude, false);
         // Used to correct a bug. The mavlink message altitude field is meant to be in meters BUT
@@ -74,9 +82,8 @@ public:
         nav_sat_sub = mp_nh.subscribe("input_fix", 1, &OptitrackPlugin::fix_cb, this);
         nav_sat_pub = mp_nh.advertise<sensor_msgs::NavSatFix>("fix", 1);
 
-        dynamic_reconfigure::Server<mavros_external_tracker::TrackerConfig>::CallbackType f = boost::bind(&OptitrackPlugin::dynamic_reconfigure, this, _1, _2);
+        dynamic_reconfigure::Server<mavros_external_tracker::TrackerConfig>::CallbackType f =   boost::bind(&OptitrackPlugin::dynamic_reconfigure, this, _1, _2);
         server.setCallback(f);
-
     }
 
     Subscriptions get_subscriptions()
@@ -88,9 +95,9 @@ private:
 
     dynamic_reconfigure::Server<mavros_external_tracker::TrackerConfig> server;
 
-    std::string utm_zone_;
+    std::string utm_zone;
     ros::NodeHandle mp_nh;
-    ros::NodeHandle r_nh;
+    // ros::NodeHandle r_nh;
     int gps_id;
     ros::Subscriber mocap_pose_sub;
 	 ros::Subscriber mocap_odom_sub;
@@ -99,12 +106,12 @@ private:
     ros::Publisher nav_sat_pub;
 
     bool include_altitude, include_gps_altitude;
-    double altitude_factor;
+    double altitude_factor, dop_factor;
     double h_error, v_error, s_error;
     ros::Time range_stamp;
     double range;
     bool range_is_valid;
-    bool range_enable;
+    bool range_enable, range_necessary;
     double range_max;
     double range_timeout;
     bool enable_logs;
@@ -112,9 +119,10 @@ private:
 
     void dynamic_reconfigure(mavros_external_tracker::TrackerConfig &config, uint32_t level)
     {
-      range_timeout = config.timeout;
-      range_enable = config.enable;
-      range_max = config.maximum;
+      range_timeout = config.range_timeout;
+      range_enable = config.range_enable;
+      range_necessary = config.range_necessary;
+      range_max = config.range_maximum;
 
       publish_fix = config.publish_fix;
       enable_logs = config.enable_logs;
@@ -123,7 +131,47 @@ private:
       h_error = config.h_error;
       v_error = config.v_error;
       include_altitude = config.include_altitude;
+      include_gps_altitude = config.include_gps_altitude;
+
     }
+
+    uint16_t ignore_flag(bool ignore_altitude, bool ignore_h_velocity, bool ignore_accuracy=false, bool ignore_v_velocity=true)
+    {
+   // v2
+   //  FLAG_ALT=1, /* ignore altitude field | */
+   //  FLAG_HDOP=2, /* ignore hdop field | */
+   //  FLAG_VDOP=4, /* ignore vdop field | */
+   //  FLAG_VEL_HORIZ=8, /* ignore horizontal velocity field (vn and ve) | */
+   //  FLAG_VEL_VERT=16, /* ignore vertical velocity field (vd) | */
+   //  FLAG_SPEED_ACCURACY=32, /* ignore speed accuracy field | */
+   //  FLAG_HORIZONTAL_ACCURACY=64, /* ignore horizontal accuracy field | */
+   //  FLAG_VERTICAL_ACCURACY=128, /* ignore vertical accuracy field | */
+
+      uint16_t flag = 0; //(int) IGNORE::FLAG_HDOP | (int) IGNORE::FLAG_VDOP;
+      if(ignore_altitude)
+      {
+         flag |= (int) IGNORE::FLAG_ALT;
+         flag |= (int) IGNORE::FLAG_VERTICAL_ACCURACY | (int) IGNORE::FLAG_VDOP;
+      }
+      if(ignore_h_velocity)
+      {
+         flag |= (int) IGNORE::FLAG_VEL_HORIZ;
+      }
+      if(ignore_v_velocity)
+      {
+         flag |= (int) IGNORE::FLAG_VEL_VERT;
+      }
+      if(ignore_v_velocity && ignore_h_velocity)
+      {
+         flag |= (int) IGNORE::FLAG_SPEED_ACCURACY;
+      }
+      if(ignore_accuracy)
+      {
+         flag |= (int) IGNORE::FLAG_HORIZONTAL_ACCURACY | (int) IGNORE::FLAG_HDOP;
+         flag |= (int) IGNORE::FLAG_VERTICAL_ACCURACY | (int) IGNORE::FLAG_VDOP;
+      }
+      return flag;
+   }
 
 
     bool use_range()
@@ -131,6 +179,12 @@ private:
       // ROS_INFO("use_range: %d %d %d", range_enable, range_is_valid, (ros::Time::now() - range_stamp).toSec() < range_timeout);
       return range_enable && range_is_valid && (ros::Time::now() - range_stamp).toSec() < range_timeout;
     }
+
+    bool skip()
+    {
+      // ROS_DEBUG("Skip? %d %d %d", range_necessary, range_enable, !use_range());
+      return range_necessary && range_enable && !use_range();
+   }
 
     /* -*- low-level send -*- */
     void mocap_send_gps_input(uint64_t usec, double lat, double lon, double alt, double ve, double vn, bool ignore_velocity, bool ignore_altitude)
@@ -161,29 +215,22 @@ private:
 
         fix.time_usec = usec;
         fix.gps_id = gps_id;
-		  fix.ignore_flags = 16; //ignore vertical velocity
-		  if(ignore_velocity)
-		  {
-			  fix.ignore_flags += 40; //i.e. ignore horizontal velocity (and its error)
-		  }
-
-        if(ignore_altitude)
-        {
-            fix.ignore_flags += 133; //i.e. ignore altitude (and its errors)
-        }
+        fix.ignore_flags = ignore_flag(ignore_altitude, ignore_velocity);
         fix.time_week_ms = 464508000; // TODO compute from UTM time
         fix.time_week = 1914; // TODO compute from UTM time
         fix.lat = round(lat * 1e7);
         fix.lon = round(lon * 1e7);
         fix.fix_type = 3;
         fix.alt = alt * altitude_factor;
-        fix.hdop = h_error;
-        fix.vdop = v_error;
+        // TODO: It's not clear if it's meant to be a dop (i.e. unit less error scaling) or an error estimate based on dop in m
+        // fix.hdop = 0;
+        // fix.vdop = 0;
+        //
         fix.vn = vn;
         fix.ve = ve;
-        fix.speed_accuracy = s_error;
-        fix.horiz_accuracy = h_error;
-        fix.vert_accuracy = v_error;
+        fix.speed_accuracy = s_error * dop_factor;
+        fix.hdop = fix.horiz_accuracy = h_error * dop_factor;
+        fix.vdop = fix.vert_accuracy = v_error * dop_factor;
         fix.satellites_visible = 12;
         UAS_FCU(m_uas)->send_message_ignore_drop(fix);
         if(enable_logs) ROS_DEBUG("Send message %s",fix.to_yaml().data());
@@ -214,7 +261,7 @@ private:
         //should_use_range = include altitude from range
         bool ignore_altitude = !include_altitude && !should_use_range;
 
-        UTM::UTMtoLL(utm_point.y, utm_point.x, utm_zone_, lat, lon);
+        UTM::UTMtoLL(utm_point.y, utm_point.x, utm_zone, lat, lon);
         if(enable_logs) ROS_DEBUG("pose (%.2f, %.2f) -> lat = %f,  lon = %f", utm_point.x, utm_point.y, lat, lon);
         // UTM: x axis points east
         //      y axis points north
@@ -237,6 +284,7 @@ private:
     /* -*- mid-level helpers -*- */
     void mocap_odom_cb(const nav_msgs::Odometry::ConstPtr &odom_msg)
     {
+        if(skip()) return;
         geometry_msgs::PoseStamped utm_pose_msg;
         geometry_msgs::Vector3Stamped utm_velocity_msg;
 
@@ -272,6 +320,7 @@ private:
     /* -*- mid-level helpers -*- */
     void mocap_pose_cb(const geometry_msgs::PoseStamped::ConstPtr &pose_msg)
     {
+        if(skip()) return;
         geometry_msgs::PoseStamped utm_pose_msg;
         try {
             geometry_msgs::TransformStamped transform = m_uas->tf2_buffer.lookupTransform("utm", pose_msg->header.frame_id, ros::Time(0), ros::Duration(0.1));
@@ -286,50 +335,73 @@ private:
 
     void fix_cb(const sensor_msgs::NavSatFix::ConstPtr &fix_msg)
     {
+      if(skip()) return;
+
+      //if not fix, skip:
+
+      //if(fix_msg->status.status == sensor_msgs::NavSatStatus::STATUS_NO_FIX) return;
+
       uint64_t usec = fix_msg->header.stamp.toNSec() / 1000;
       mavlink::common::msg::GPS_INPUT fix;
       fix.time_usec = usec;
       fix.gps_id = gps_id;
-      fix.ignore_flags = 56; //ignore velocity amd its error
-      // if(!include_altitude)
-      // {
-      //     fix.ignore_flags += 133; //i.e. ignore altitude (and its errors)
-      // }
       fix.time_week_ms = 464508000; // TODO compute from UTM time
       fix.time_week = 1914; // TODO compute from UTM time
       fix.lat = round(fix_msg->latitude * 1e7);
       fix.lon = round(fix_msg->longitude * 1e7);
-      if(fix_msg->status.status == sensor_msgs::NavSatStatus::STATUS_NO_FIX)
+      //fix.vdop = 0;
+      //fix.hdop = 0;
+
+      double alt = fix_msg->altitude;
+      bool should_use_range = use_range();
+      const bool ignore_velocity = true;
+      const bool ignore_altitude = !include_gps_altitude && !should_use_range;
+      const bool should_use_gps_alt = !ignore_altitude && !should_use_range;
+      bool ignore_accuracy = false;
+
+      if(fix_msg->position_covariance_type != sensor_msgs::NavSatFix::COVARIANCE_TYPE_UNKNOWN)
       {
-         fix.fix_type = 3;
+         // Divide by 3.0 to invert
+         // https://github.com/KumarRobotics/ublox/blob/master/ublox_gps/src/node.cpp#L109
+         fix.hdop = fix.horiz_accuracy  = std::sqrt(fix_msg->position_covariance[0]) / 3.0 * dop_factor;
+         if(should_use_gps_alt)
+         {
+            fix.vdop = fix.vert_accuracy = std::sqrt(fix_msg->position_covariance[8]) / 3.0 * dop_factor;
+         }
       }
       else
       {
-         fix.fix_type = 0;
+         ignore_accuracy = true;
       }
-
-      double alt = fix_msg->altitude;
-
-      bool should_use_range = use_range();
       if(should_use_range)
       {
          alt = range;
-         fix.vdop = v_error;
-         fix.vert_accuracy = v_error;
+         fix.vdop = fix.vert_accuracy = v_error;
       }
 
-      if(!include_gps_altitude && !should_use_range)
+      if(fix_msg->status.status == sensor_msgs::NavSatStatus::STATUS_NO_FIX)
       {
-          fix.ignore_flags += 133; //i.e. ignore altitude (and its errors)
+         fix.fix_type = 0;
       }
+      else if(ignore_altitude)
+      {
+         fix.fix_type = 2; //2Dfix
+      }
+      else{
+         fix.fix_type = 3; //3Dfix
+      }
+      // No velocity
+      fix.vn = 0.0;
+      fix.ve = 0.0;
+      fix.vd = 0.0;
+      fix.speed_accuracy = 0.0;
 
       fix.alt = alt * altitude_factor;
-      // TODO: get errors from fix_msg->covariance and fix_msg->position_covariance_type
-      // fix.hdop = h_error;
-      // fix.vdop = v_error;
-      // fix.horiz_accuracy = h_error;
-      // fix.vert_accuracy = v_error;
+      // CHANGED: get errors from fix_msg->covariance and fix_msg->position_covariance_type
+
+      fix.ignore_flags = ignore_flag(ignore_altitude, ignore_velocity, ignore_accuracy);
       fix.satellites_visible = 10;
+
       UAS_FCU(m_uas)->send_message_ignore_drop(fix);
       if(enable_logs) ROS_DEBUG("Send message %s",fix.to_yaml().data());
       if(publish_fix) nav_sat_pub.publish(fix_msg);
