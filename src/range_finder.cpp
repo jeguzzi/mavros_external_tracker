@@ -17,7 +17,7 @@ void initialize(UAS &uas_)
 {
         PluginBase::initialize(uas_);
         range_pub = mp_nh.advertise<sensor_msgs::Range>("range", 1);
-        mp_nh.param<std::string>("frame_id", range_msg.header.frame_id, "fcu");
+        mp_nh.param<std::string>("frame_id", range_msg.header.frame_id, "range_finder");
         mp_nh.param<float>("min_range", range_msg.min_range, 0.0);
         mp_nh.param<float>("max_range", range_msg.max_range, 10.0);
         mp_nh.param<float>("field_of_view", range_msg.field_of_view, 0.052);
@@ -34,6 +34,7 @@ void initialize(UAS &uas_)
         else{
                 ROS_ERROR("Wrong radiation_type parameter. Should be one of infrared or ultrasound");
         }
+        UAS_DIAG(m_uas).add("Range finder", this, &RangeFinderPlugin::update_diagnostics);
 }
 
 Subscriptions get_subscriptions()
@@ -47,6 +48,20 @@ private:
 ros::NodeHandle mp_nh;
 ros::Publisher range_pub;
 sensor_msgs::Range range_msg;
+
+
+void update_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat)
+{
+   if((ros::Time::now() - range_msg.header.stamp).toSec() < 1.0)
+   {
+      stat.summary(0, "Ok");
+      stat.addf("Range", "%.2f m", range_msg.range);
+   }
+   else
+   {
+      stat.summary(2, "Not alive");
+   }
+}
 
 /**
  * Receive distance sensor data from FCU.
