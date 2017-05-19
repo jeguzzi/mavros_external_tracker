@@ -4,23 +4,36 @@
   <arg name="ns" default="" />
   <arg name="rigid_body" default="erlerover"/>
 
-  <rosparam param="mavros/mocap">
+  <rosparam param="$(arg ns)/mavros/mocap">
      publish_fix: true
-     utm_zone: 32N
+     range_necessary: false
+     utm_zone: 32T
      gps_id: 0
   </rosparam>
 
-  <node pkg="topic_tools" type="throttle" name="throttle_pose" args="messages optitrack/$(arg rigid_body) 10.0 $(arg ns)/mavros/mocap/pose"/>
+  <!-- <node pkg="topic_tools" type="throttle" name="throttle_pose" args="messages optitrack/$(arg rigid_body) 10.0 $(arg ns)/mavros/mocap/pose"/> -->
 
-  <arg name="fcu_url" default="udp://:14550@"/>
-  <arg name="gcs_url" default="udp://@"/>
+
+  <remap from="$(arg ns)/mavros/rangefinder/range" to="$(arg ns)/mavros/mocap/range"/>
+
+  <arg name="fcu_url" default=""/>
+  <arg name="gcs_url" default=""/>
   <arg name="tgt_system" default="1"/>
   <arg name="tgt_component" default="1"/>
   <arg name="log_output" default="screen"/>
 
+
+  <rosparam param="$(arg ns)/mavros/global_position/tf/child_frame_id" subst_value="true">
+     $(arg ns)/base_link
+  </rosparam>
+
+  <rosparam param="$(arg ns)/mavros/rangefinder/frame_id" subst_value="true">
+     $(arg ns)/range_finder
+  </rosparam>
+
   <include file="$(find mavros)/launch/node.launch" ns="$(arg ns)">
     <arg name="pluginlists_yaml" value="$(find mavros_external_tracker)/launch/apm_pluginlists.yaml"/>
-    <arg name="config_yaml" value="$(find mavros)/launch/apm_config.yaml"/>
+    <arg name="config_yaml" value="$(find mavros_external_tracker)/launch/apm_config.yaml"/>
     <arg name="fcu_url" value="$(arg fcu_url)"/>
     <arg name="gcs_url" value="$(arg gcs_url)"/>
     <arg name="tgt_system" value="$(arg tgt_system)"/>
@@ -28,10 +41,13 @@
     <arg name="log_output" value="$(arg log_output)"/>
   </include>
 
+  <!-- <rosparam param="$(arg ns)/mavros/global_position/tf/child_frame_id" subst_value="true">
+     $(arg ns)/base_link
+  </rosparam> -->
   <!-- <arg name="model" default="$(find mavros_external_tracker)/urdf/rover_scaled.urdf"/> -->
   <arg name="tf_prefix" default="$(arg ns)"/>
   <arg name="log_file" default="$(arg ns)"/>
-
+  <param name="tf_prefix" type="string" value="$(arg tf_prefix)"/>
   <!-- send the robot XML to param server -->
   <!-- <param name="robot_description" command="
       $(find xacro)/xacro.py '$(arg model)'

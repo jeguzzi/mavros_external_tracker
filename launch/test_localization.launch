@@ -1,0 +1,22 @@
+<launch>
+   <node name='localization' pkg='mavros_external_tracker' type='localization.py' output="screen">
+      <param name="timeout" value="0.5"/>
+      <param name="max_rate" value="5.0"/>
+      <param name="active" value="true"/>
+      <param name="active_index" value="0"/>
+      <rosparam param="in">
+-
+   label: pozyx
+   topic: pose
+   type: pose
+-
+   label: optitrack
+   topic: /optitrack/copter_0
+   type: pose
+-
+   label: gps
+   topic: fix
+   type: fix
+      </rosparam>
+   </node>
+</launch>
