@@ -14,6 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   nav_msgs
   dynamic_reconfigure
+  diagnostic_updater
+  diagnostic_msgs
 )
 
 find_package(Eigen3)
@@ -35,6 +37,7 @@ include(MavrosMavlink)
 
 generate_dynamic_reconfigure_options(
   cfg/Tracker.cfg
+  cfg/Localization.cfg
 )
 
 
