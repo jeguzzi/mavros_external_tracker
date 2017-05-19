@@ -1,0 +1,7 @@
+version: '2'
+services:
+  gps_driver:
+     build:
+        dockerfile: docker/gps-armhf/Dockerfile
+        context: ../..
+     image: jeguzzi/df:armhf-gps

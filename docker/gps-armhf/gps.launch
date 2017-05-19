@@ -1,0 +1,9 @@
+<launch>
+   <arg name="port" default="/dev/ttyS0"/>
+   <arg name="baudrate" default="38400"/>
+   <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver">
+      <param name="port" value="$(arg port)"/>
+      <param name="baudrate" value="$(arg baudrate)"/>
+      <param name="frame_id" value="base_link"/>
+   </node>
+</launch>
